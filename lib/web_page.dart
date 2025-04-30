@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -223,6 +225,7 @@ class _WebPageState extends State<WebPage> {
       final controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..setBackgroundColor(const Color(0xFFFFFFFF))
+        ..enableZoom(false)
         ..loadHtmlString(htmlContent);
 
       return controller;
@@ -239,126 +242,140 @@ class _WebPageState extends State<WebPage> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : controllers.isEmpty
-              ? const Center(child: Text('No content available'))
-              : SafeArea(
-                  child: Stack(
-                    children: [
-                      // PageView for swiping between pages
-                      PageView.builder(
-                        controller: pageController,
-                        physics:
-                            const PageScrollPhysics(), // Enables page-like swiping
-                        scrollDirection: Axis.horizontal,
-                        itemCount: controllers.length,
-                        onPageChanged: (index) {
-                          setState(() {
-                            currentPage = index;
-                          });
-                        },
-                        itemBuilder: (context, index) {
-                          return Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                  color: Colors.grey.shade200, width: 0.5),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            margin: const EdgeInsets.all(4),
-                            child:
-                                WebViewWidget(controller: controllers[index]),
-                          );
+          ? const Center(child: Text('No content available'))
+          : SafeArea(
+        child: Stack(
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onHorizontalDragEnd: (details) {
+                if (details.primaryVelocity! > 0) {
+                  pageController.previousPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                  );
+                } else if (details.primaryVelocity! < 0) {
+                  pageController.nextPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                  );
+                }
+              },
+              child: PageView.builder(
+                controller: pageController,
+                physics: const ClampingScrollPhysics(),
+                scrollDirection: Axis.horizontal,
+                itemCount: controllers.length,
+                onPageChanged: (index) {
+                  setState(() => currentPage = index);
+                },
+                itemBuilder: (context, index) {
+                  return SizedBox.expand(
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: WebViewWidget(
+                        controller: controllers[index],
+                        gestureRecognizers: {
+                          Factory<VerticalDragGestureRecognizer>(
+                                () => VerticalDragGestureRecognizer(),
+                          ),
                         },
                       ),
+                    ),
+                  );
+                },
+              ),
+            ),
 
-                      // Page indicator
-                      Positioned(
-                        bottom: 16,
-                        right: 16,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Text(
-                            '${currentPage + 1} / ${controllers.length}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Side navigation buttons (optional)
-                      if (currentPage > 0)
-                        Positioned(
-                          left: 8,
-                          top: 0,
-                          bottom: 0,
-                          child: GestureDetector(
-                            onTap: () {
-                              pageController.previousPage(
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeOut,
-                              );
-                            },
-                            child: Container(
-                              width: 40,
-                              color: Colors.transparent,
-                              child: Center(
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black26,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: const Icon(
-                                    Icons.chevron_left,
-                                    color: Colors.white,
-                                    size: 24,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                      if (currentPage < controllers.length - 1)
-                        Positioned(
-                          right: 8,
-                          top: 0,
-                          bottom: 0,
-                          child: GestureDetector(
-                            onTap: () {
-                              pageController.nextPage(
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeOut,
-                              );
-                            },
-                            child: Container(
-                              width: 40,
-                              color: Colors.transparent,
-                              child: Center(
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black26,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: const Icon(
-                                    Icons.chevron_right,
-                                    color: Colors.white,
-                                    size: 24,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
+            // Page indicator
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  '${currentPage + 1} / ${controllers.length}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
+              ),
+            ),
+
+            // Left navigation button
+            if (currentPage > 0)
+              Positioned(
+                left: 8,
+                top: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  onTap: () =>
+                      pageController.previousPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      ),
+                  child: Container(
+                    width: 40,
+                    color: Colors.transparent,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Icon(
+                          Icons.chevron_left,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+            // Right navigation button
+            if (currentPage < controllers.length - 1)
+              Positioned(
+                right: 8,
+                top: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  onTap: () =>
+                      pageController.nextPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      ),
+                  child: Container(
+                    width: 40,
+                    color: Colors.transparent,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Icon(
+                          Icons.chevron_right,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
